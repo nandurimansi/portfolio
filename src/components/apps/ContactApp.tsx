@@ -54,20 +54,17 @@ export function ContactApp() {
 
     // 1. Forward directly to Gmail via Web3Forms
     try {
+      const formData = new FormData();
+      formData.append('access_key', WEB3FORMS_KEY);
+      formData.append('name', form.name);
+      formData.append('email', form.email);
+      formData.append('message', form.message);
+      formData.append('subject', `Portfolio Message from ${form.name}`);
+      formData.append('from_name', `${form.name} (via Portfolio)`);
+
       const response = await fetch('https://api.web3forms.com/submit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          access_key: WEB3FORMS_KEY,
-          name: form.name,
-          email: form.email,
-          message: form.message,
-          subject: `Portfolio Message from ${form.name}`,
-          from_name: `${form.name} (via Portfolio)`,
-        }),
+        body: formData,
       });
       const data = await response.json();
       if (data.success) {
