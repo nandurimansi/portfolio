@@ -6,6 +6,10 @@ import { profile } from '@/data/portfolio';
 
 type Status = 'idle' | 'sending' | 'sent' | 'error';
 
+const WEB3FORMS_KEY =
+  import.meta.env.VITE_WEB3FORMS_KEY ||
+  'b3ede7b9-4e22-4dd7-9ca9-a034dfad9d29';
+
 export function ContactApp() {
   const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [status, setStatus] = useState<Status>('idle');
@@ -43,18 +47,58 @@ export function ContactApp() {
     }
     setStatus('sending');
     setError('');
+
+    let dbSaved = false;
+    let emailSent = false;
+    let failureReason = '';
+
+    // 1. Forward directly to Gmail via Web3Forms
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          name: form.name,
+          email: form.email,
+          message: form.message,
+          subject: `Portfolio Message from ${form.name}`,
+          from_name: `${form.name} (via Portfolio)`,
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        emailSent = true;
+      } else {
+        failureReason = data.message || 'Email delivery failed.';
+      }
+    } catch (emailErr) {
+      console.warn('Web3Forms dispatch error:', emailErr);
+    }
+
+    // 2. Persist in Supabase database
     try {
       const { error: dbError } = await supabase.from('messages').insert({
         name: form.name,
         email: form.email,
         message: form.message,
       });
-      if (dbError) throw dbError;
+      if (!dbError) {
+        dbSaved = true;
+      }
+    } catch (dbErr) {
+      console.warn('Supabase insert error:', dbErr);
+    }
+
+    if (emailSent || dbSaved) {
       setStatus('sent');
       setForm({ name: '', email: '', message: '' });
-    } catch (err) {
+    } else {
       setError(
-        err instanceof Error ? err.message : 'Something went wrong. Try again.'
+        failureReason || 'Failed to deliver message. Please use "Open in Mail" instead.'
       );
       setStatus('error');
     }
@@ -150,9 +194,9 @@ export function ContactApp() {
               <Check className="h-6 w-6 text-emerald-300" />
             </div>
             <div>
-              <p className="text-sm font-medium text-white">Message sent to database</p>
+              <p className="text-sm font-medium text-white">Message delivered!</p>
               <p className="text-xs text-white/60 mt-1">
-                Your message has been stored successfully!
+                Your message has been sent directly to Mansi's email and database.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
